@@ -4,6 +4,7 @@ import connection from './config/db.js'
 import userModel from "./models/user.js";
 import teachModel from "./models/teach.js";
 import bcrypt from 'bcrypt'
+import noticeModel from "./models/notice.js";
 
 const app = express();
 const port = 3000;
@@ -15,6 +16,58 @@ app.use(express.json()); // Parses incoming JSON requests
 // ✅ Routes
 app.get("/", (req, res) => {
   res.send("Backend is running");
+});
+
+// Notices API
+// Create a notice
+app.post("/notices", async (req, res) => {
+  try {
+    const { heading, description, category = "general", priority = "normal", targetAudience = "all", fileUrl = null, authorEmail } = req.body;
+
+    if (!heading || !description) {
+      return res.status(400).json({ message: "Heading and description are required" });
+    }
+
+    const notice = await noticeModel.create({
+      heading,
+      description,
+      category,
+      priority,
+      targetAudience,
+      fileUrl,
+      authorEmail,
+    });
+
+    res.status(201).json({ notice });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to create notice" });
+  }
+});
+
+// Get notices (optionally filter by audience or author)
+app.get("/notices", async (req, res) => {
+  try {
+    const { audience, authorEmail } = req.query;
+    const filter = {};
+
+    if (audience && audience !== 'all') {
+      filter.$or = [
+        { targetAudience: audience },
+        { targetAudience: 'all' }
+      ];
+    }
+
+    if (authorEmail) {
+      filter.authorEmail = authorEmail;
+    }
+
+    const notices = await noticeModel.find(filter).sort({ createdAt: -1 });
+    res.json({ notices });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch notices" });
+  }
 });
 
 app.post("/login", async (req, res) => {
